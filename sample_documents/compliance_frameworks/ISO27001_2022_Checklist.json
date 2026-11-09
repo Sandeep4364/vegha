@@ -1,0 +1,37 @@
+[
+  {
+    "id": "A.5.15",
+    "framework": "ISO 27001:2022",
+    "title": "Access Control",
+    "requirement": "Rules to control physical and logical access to information and other associated assets shall be established and implemented based on business and information security requirements.",
+    "category": "Organizational Controls"
+  },
+  {
+    "id": "A.5.18",
+    "framework": "ISO 27001:2022",
+    "title": "Access Rights Management",
+    "requirement": "The allocation and use of access rights shall be assigned, implemented, reviewed and revoked in accordance with the organization's topic-specific policy on and rules for access control.",
+    "category": "Organizational Controls"
+  },
+  {
+    "id": "A.5.24",
+    "framework": "ISO 27001:2022",
+    "title": "Information Security Incident Management Planning",
+    "requirement": "The organization shall plan and prepare for managing information security incidents by defining, establishing and communicating information security incident management processes, roles and responsibilities.",
+    "category": "Incident Management"
+  },
+  {
+    "id": "A.8.8",
+    "framework": "ISO 27001:2022",
+    "title": "Management of Technical Vulnerabilities",
+    "requirement": "Information about technical vulnerabilities of information systems in use shall be obtained, the organization's exposure to such vulnerabilities evaluated and appropriate measures taken.",
+    "category": "Technological Controls"
+  },
+  {
+    "id": "A.8.24",
+    "framework": "ISO 27001:2022",
+    "title": "Use of Cryptography",
+    "requirement": "Rules for the effective use of cryptography, including cryptographic key management, shall be defined and implemented.",
+    "category": "Technological Controls"
+  }
+]

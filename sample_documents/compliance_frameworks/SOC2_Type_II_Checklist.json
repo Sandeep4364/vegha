@@ -1,0 +1,72 @@
+[
+  {
+    "id": "CC6.1",
+    "framework": "SOC 2 Type II",
+    "title": "Logical Access Security & Perimeter Controls",
+    "requirement": "The entity implements logical access security software, infrastructure, and architectures over protected information assets to protect them from security events to meet its commitments and system requirements.",
+    "category": "Logical Access"
+  },
+  {
+    "id": "CC6.2",
+    "framework": "SOC 2 Type II",
+    "title": "User Registration, Authentication & MFA",
+    "requirement": "Prior to issuing system credentials and granting system access, the entity registers and authorizes new internal and external users whose access is administered by the entity. Multi-factor authentication is required for all administrative access.",
+    "category": "Logical Access"
+  },
+  {
+    "id": "CC6.3",
+    "framework": "SOC 2 Type II",
+    "title": "Access Modification & Timely Deprovisioning",
+    "requirement": "The entity authorizes, modifies, or removes access to data, software, functions, and other protected information assets based on changes in job responsibilities or termination of employment. Revocation must occur promptly upon departure.",
+    "category": "Logical Access"
+  },
+  {
+    "id": "CC6.6",
+    "framework": "SOC 2 Type II",
+    "title": "Logical Boundary & Network Protections",
+    "requirement": "The entity implements logical boundaries to protect protected information assets from other systems and entities, including firewalls, segmentation, and bastion jump hosts.",
+    "category": "Network Security"
+  },
+  {
+    "id": "CC6.7",
+    "framework": "SOC 2 Type II",
+    "title": "Encryption in Transit and at Rest",
+    "requirement": "The entity protects data in transit over public networks and untrusted networks, and data stored at rest using robust encryption mechanisms (e.g. AES-256, TLS 1.3).",
+    "category": "Cryptography"
+  },
+  {
+    "id": "CC7.1",
+    "framework": "SOC 2 Type II",
+    "title": "Vulnerability Management & Scanning",
+    "requirement": "To meet its commitments and system requirements, the entity uses detection and monitoring procedures to identify changes to configurations and new vulnerabilities across systems.",
+    "category": "System Operations"
+  },
+  {
+    "id": "CC7.2",
+    "framework": "SOC 2 Type II",
+    "title": "Security Incident Detection & Triage",
+    "requirement": "The entity monitors system components and the operation of those components for anomalies that are indicative of malicious acts, natural disasters, and errors affecting the entity's ability to meet its commitments.",
+    "category": "Incident Response"
+  },
+  {
+    "id": "CC7.3",
+    "framework": "SOC 2 Type II",
+    "title": "Incident Containment & Response Procedures",
+    "requirement": "The entity evaluates security events to determine whether they could impact the entity's ability to meet its commitments and system requirements, and executes defined containment, eradication, and post-mortem procedures.",
+    "category": "Incident Response"
+  },
+  {
+    "id": "CC7.4",
+    "framework": "SOC 2 Type II",
+    "title": "Incident Notification Timelines",
+    "requirement": "The entity responds to identified security incidents by executing a defined incident response program, including notification to affected internal and external parties within required contractual and legal timeframes.",
+    "category": "Incident Response"
+  },
+  {
+    "id": "CC8.1",
+    "framework": "SOC 2 Type II",
+    "title": "Change Management & Code Review",
+    "requirement": "The entity authorizes, designs, develops or acquires, configures, tests, approves, and implements changes to infrastructure, data, software, and procedures to meet its commitments and system requirements.",
+    "category": "Change Management"
+  }
+]
