@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.env
+.env.local
+
+# Virtual Environments
+backend/venv/
+.venv/
+
+# Data (generated at runtime)
+backend/data/
+backend-node/data/
+backend-node/dist/
+backend-node/.tsupgrader/
+temp_uploads/
+
+# Node
+node_modules/
+.next/
+out/
+.env*.local
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.qodo/
+
+# OS
+.DS_Store
+Thumbs.db
