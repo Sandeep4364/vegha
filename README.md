@@ -137,6 +137,10 @@ npm run dev
 
 Open http://localhost:3000 in your browser.
 
+For a deployed frontend, set `NEXT_PUBLIC_API_URL` to the public URL of the
+running Node backend. If the frontend server should proxy `/api/*` requests,
+also set `BACKEND_URL` to that same backend URL before building.
+
 ---
 
 ## 📁 Project Structure

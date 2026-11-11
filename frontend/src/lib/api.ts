@@ -9,17 +9,27 @@ async function request<T>(input: RequestInfo | URL, init?: RequestInit): Promise
   }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
+    const body = await res.text();
     try {
-      const body = await res.json();
-      if (typeof body?.detail === "string") message = body.detail;
-      else if (typeof body?.message === "string") message = body.message;
+      const parsed = JSON.parse(body);
+      if (typeof parsed?.detail === "string") message = parsed.detail;
+      else if (typeof parsed?.message === "string") message = parsed.message;
+      else if (body) message = body;
     } catch {
-      const text = await res.text();
-      if (text) message = text;
+      if (body) {
+        const contentType = res.headers.get("content-type") || "";
+        message = contentType.includes("text/html")
+          ? `Backend API is unavailable at ${new URL(input.toString(), window.location.origin).origin}. Configure NEXT_PUBLIC_API_URL to your deployed backend URL.`
+          : body;
+      }
     }
     throw new Error(message);
   }
-  return res.json() as Promise<T>;
+  try {
+    return await res.json() as T;
+  } catch {
+    throw new Error("The backend returned an invalid response. Check that the configured API URL points to the Node backend.");
+  }
 }
 
 export interface Citation {

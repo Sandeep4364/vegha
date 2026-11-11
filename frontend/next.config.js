@@ -4,17 +4,16 @@ const nextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
 
   async rewrites() {
-    // Use the local backend only during development.
-    if (process.env.NODE_ENV === "development") {
+    const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+    if (process.env.NODE_ENV === "development" || process.env.BACKEND_URL) {
       return [
         {
           source: "/api/:path*",
-          destination: "http://127.0.0.1:8000/api/:path*",
+          destination: `${backendUrl}/api/:path*`,
         },
       ];
     }
 
-    // Production API requests will use the deployed backend URL.
     return [];
   },
 };
