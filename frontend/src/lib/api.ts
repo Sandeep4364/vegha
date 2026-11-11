@@ -18,8 +18,13 @@ async function request<T>(input: RequestInfo | URL, init?: RequestInit): Promise
     } catch {
       if (body) {
         const contentType = res.headers.get("content-type") || "";
+        const requestUrl = typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
         message = contentType.includes("text/html")
-          ? `Backend API is unavailable at ${new URL(input.toString(), window.location.origin).origin}. Configure NEXT_PUBLIC_API_URL to your deployed backend URL.`
+          ? `Backend API is unavailable at ${new URL(requestUrl, window.location.origin).origin}. Configure NEXT_PUBLIC_API_URL to your deployed backend URL.`
           : body;
       }
     }
