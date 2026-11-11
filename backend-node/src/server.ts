@@ -26,14 +26,22 @@ function frameworks(): any[] {
 function notes() {
   return db.prepare("SELECT slug,title,type,tags,content FROM vault_notes").all().map((n: any) => ({ ...n, tags: JSON.parse(n.tags) }));
 }
+const VAULT_CROSS_LINKS: Record<string, string[]> = {
+  "access-control-and-key-management-runbook": ["SOC2 Information Security Policy", "Data Retention and Privacy Policy"],
+  "incident-response-plan-sop": ["SOC2 Information Security Policy", "Access Control and Key Management Runbook"],
+  "data-retention-and-privacy-policy": ["SOC2 Information Security Policy", "Access Control and Key Management Runbook"],
+  "soc2-information-security-policy": ["Incident Response Plan SOP", "Access Control and Key Management Runbook", "Data Retention and Privacy Policy"]
+};
 function seedVault() {
-  if ((db.prepare("SELECT COUNT(*) AS count FROM vault_notes").get() as any).count) return;
   const docs = fs.readdirSync(path.join(root, "sample_documents")).filter(x => /\.(md|txt)$/i.test(x));
-  const insert = db.prepare("INSERT OR IGNORE INTO vault_notes VALUES (?, ?, ?, ?, ?)");
+  const insert = db.prepare("INSERT OR REPLACE INTO vault_notes VALUES (?, ?, ?, ?, ?)");
   docs.forEach(file => {
     const slug = file.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const title = file.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
-    insert.run(slug, title, "policy", JSON.stringify(["compliance", "source"]), fs.readFileSync(path.join(root, "sample_documents", file), "utf8"));
+    const body = fs.readFileSync(path.join(root, "sample_documents", file), "utf8");
+    const related = VAULT_CROSS_LINKS[slug];
+    const content = related ? `${body}\n\n## Related Notes\n${related.map(t => `- [[${t}]]`).join("\n")}` : body;
+    insert.run(slug, title, "policy", JSON.stringify(["compliance", "source"]), content);
   });
 }
 seedVault();
@@ -69,17 +77,37 @@ app.get("/api/compliance/evaluate/:framework_id", (req, res) => {
   res.json({ framework_id: fw.id, framework_name: fw.name, total_requirements: findings.length, covered, partially_covered: partial, missing: findings.length - covered - partial, compliance_score: findings.length ? Math.round((covered + partial * 0.5) / findings.length * 100) : 0, findings });
 });
 app.get("/api/vault/notes", (_req, res) => res.json(notes().map(({ content, ...n }) => n)));
-app.get("/api/vault/notes/:slug", (req, res) => { const note = notes().find((n: any) => n.slug === req.params.slug); return note ? res.json(note) : res.status(404).json({ detail: "Note not found" }); });
-function graph() {
-  const all = notes();
+type NoteLink = { id: string; title: string };
+function linkMaps(all: ReturnType<typeof notes>) {
   const byTitle = new Map<string, any>(all.flatMap((n: any) => [[n.slug, n], [n.title.toLowerCase(), n]]));
-  const links: Array<{ source: string; target: string; label: string }> = [];
+  const outgoing = new Map<string, NoteLink[]>();
+  const backlinks = new Map<string, NoteLink[]>();
+  const push = (map: Map<string, NoteLink[]>, key: string, val: NoteLink) => {
+    const arr = map.get(key) || [];
+    if (!arr.some(x => x.id === val.id)) { arr.push(val); map.set(key, arr); }
+  };
   all.forEach((note: any) => {
     for (const match of note.content.matchAll(/\[\[([^\]|#]+)(?:\|[^\]]+)?\]\]/g)) {
       const target = byTitle.get(match[1].trim().toLowerCase());
-      if (target && target.slug !== note.slug) links.push({ source: note.slug, target: target.slug, label: "wikilink" });
+      if (!target || target.slug === note.slug) continue;
+      push(outgoing, note.slug, { id: target.slug, title: target.title });
+      push(backlinks, target.slug, { id: note.slug, title: note.title });
     }
   });
+  return { outgoing, backlinks };
+}
+app.get("/api/vault/notes/:slug", (req, res) => {
+  const all = notes();
+  const note = all.find((n: any) => n.slug === req.params.slug);
+  if (!note) return res.status(404).json({ detail: "Note not found" });
+  const { outgoing, backlinks } = linkMaps(all);
+  return res.json({ ...note, outgoing: outgoing.get(note.slug) || [], backlinks: backlinks.get(note.slug) || [] });
+});
+function graph() {
+  const all = notes();
+  const { outgoing } = linkMaps(all);
+  const links: Array<{ source: string; target: string; label: string }> = [];
+  outgoing.forEach((targets, source) => targets.forEach(t => links.push({ source, target: t.id, label: "wikilink" })));
   const counts = new Map<string, number>();
   links.forEach(l => { counts.set(l.source, (counts.get(l.source) || 0) + 1); counts.set(l.target, (counts.get(l.target) || 0) + 1); });
   return {
@@ -88,6 +116,18 @@ function graph() {
   };
 }
 app.get("/api/vault/graph", (_req, res) => res.json(graph()));
+app.post("/api/compliance/gap-analysis", (req, res) => {
+  const title = String(req.body?.title || "").trim();
+  const requirementText = String(req.body?.requirement_text || "").trim();
+  if (!title || !requirementText) return res.status(400).json({ detail: "title and requirement_text are required" });
+  const result = callTool("perform_gap_analysis", {
+    requirement_id: String(req.body?.requirement_id || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")),
+    title,
+    requirement_text: requirementText,
+    category: req.body?.category
+  });
+  res.json(result);
+});
 const tools = [
   { name: "search_documents", description: "Search indexed enterprise documents.", inputSchema: { type: "object", properties: { query: { type: "string" }, top_k: { type: "integer", default: 4 }, doc_id_filter: { type: "string" } }, required: ["query"] } },
   { name: "retrieve_citation", description: "Fetch verified citation details for a chunk.", inputSchema: { type: "object", properties: { chunk_id: { type: "string" } }, required: ["chunk_id"] } },
