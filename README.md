@@ -17,7 +17,7 @@
 │  • Document Manager     │      │  │  MCP Server (8 tools)                │     │
 │                         │      │  │    ↓          ↓          ↓           │     │
 │                         │      │  │  VectorStore  WikiVault  Compliance  │     │
-│                         │      │  │  (SQLite+FTS) (Obsidian) Engine      │     │
+│                         │      │  │  (Supabase+FTS) (Obsidian) Engine    │     │
 │                         │      │  └──────────────────────────────────────┘     │
 │                         │      │                                              │
 │                         │      │  Local deterministic synthesis engine        │
@@ -88,8 +88,8 @@ The system builds an **Obsidian-compatible knowledge vault**:
             [Knowledge Entry]
 ```
 
-Notes are persisted in the Node SQLite vault table at `backend-node/data/vegah.db`
-and use Obsidian-compatible Markdown content.
+Notes are persisted in the Supabase `vault_notes` table and use
+Obsidian-compatible Markdown content.
 
 ---
 
@@ -97,10 +97,10 @@ and use Obsidian-compatible Markdown content.
 
 | Component | Solution | Cost |
 |-----------|----------|------|
-| **Retrieval** | SQLite FTS5 lexical search over indexed chunks | **$0** — no vector DB |
+| **Retrieval** | Postgres full-text search over indexed chunks (Supabase) | **$0** — no vector DB |
 | **Answer synthesis** | Deterministic citation-based local synthesis | **$0** — no API key |
-| **Storage** | SQLite database and persisted uploads | **$0** |
-| **Knowledge Graph** | SQLite vault notes + `[[wikilinks]]` | **$0** |
+| **Storage** | Supabase (Postgres) for documents, chunks, and vault notes | **$0** |
+| **Knowledge Graph** | Supabase vault notes + `[[wikilinks]]` | **$0** |
 | **Frontend** | Static Next.js export or Vercel free tier | **$0** |
 
 **Total ongoing cost: $0/month** under normal usage patterns.
@@ -125,7 +125,7 @@ npm start
 ```
 
 On startup, the backend automatically indexes supported files from
-`sample_documents/` into SQLite. Existing filenames are skipped, so restarting
+`sample_documents/` into Supabase. Existing filenames are skipped, so restarting
 the service does not create duplicate document records.
 
 ### Frontend Setup
@@ -145,7 +145,7 @@ Open http://localhost:3000 in your browser.
 Vegah/
 ├── backend-node/
 │   ├── src/
-│   │   ├── db.ts               # SQLite persistence and FTS5 retrieval
+│   │   ├── db.ts               # Supabase persistence and full-text retrieval
 │   │   ├── ingest.ts           # PDF/DOCX/MD/TXT extraction and chunking
 │   │   └── server.ts           # Express API and MCP tools
 │   ├── package.json
@@ -192,9 +192,9 @@ Vegah/
 | `POST` | `/api/mcp/call` | Direct MCP tool invocation |
 
 Uploaded files are validated (PDF, DOCX, Markdown, or TXT), limited to
-25 MB by default, and indexed into `backend-node/data/vegah.db`. The SQLite
-database stores document metadata, extracted chunks, FTS5 search records, and
-vault notes so the index survives backend restarts.
+25 MB by default, and indexed into Supabase. The database stores document
+metadata, extracted chunks with a full-text search index, and vault notes so
+the index survives backend restarts.
 | `POST` | `/mcp/` | Standards-compliant MCP v2 Streamable HTTP transport |
 
 The MCP transport responds to JSON-RPC `initialize`, `tools/list`, and `tools/call`
@@ -214,7 +214,7 @@ clients can connect directly to `http://127.0.0.1:8000/mcp/`.
 ## 🎯 Key Design Decisions
 
 1. **Hybrid Retrieval**: BM25 lexical + dense cosine similarity merged via Reciprocal Rank Fusion — better recall than either alone.
-2. **No Vector DB dependency**: SQLite + numpy eliminates Pinecone/Weaviate/Chroma costs and complexity.
+2. **No Vector DB dependency**: Supabase Postgres full-text search eliminates Pinecone/Weaviate/Chroma costs and complexity.
 3. **Local synthesis**: The system produces useful structured answers from retrieval results alone, without API keys or external model calls.
 4. **Real MCP Protocol**: Tools are defined with JSON schemas, the agent plans and calls them in loops — not a single LLM wrapper.
 5. **Obsidian-compatible output**: Wiki vault notes are real `.md` files with YAML frontmatter that open in Obsidian.

@@ -3,7 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import mammoth from "mammoth";
 import pdf from "pdf-parse";
-import { db } from "./db";
+import { insertDocument, insertChunks } from "./db";
 
 export async function extractText(file: string, ext: string): Promise<string> {
   if (ext === ".docx") return (await mammoth.extractRawText({ path: file })).value;
@@ -19,16 +19,15 @@ export async function ingest(file: string, originalName: string): Promise<{ docI
   const title = path.basename(originalName, ext).replace(/[_-]+/g, " ").trim() || "Document";
   const paragraphs = text.split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
   const chunks = paragraphs.length ? paragraphs : [text];
-  const insertDoc = db.prepare("INSERT INTO documents VALUES (?, ?, ?, ?)");
-  const insertChunk = db.prepare("INSERT INTO chunks VALUES (?, ?, ?, ?, ?)");
-  const insertFts = db.prepare("INSERT INTO chunks_fts VALUES (?, ?)");
-  db.transaction(() => {
-    insertDoc.run(docId, title, originalName, new Date().toISOString());
-    chunks.forEach((content, i) => {
-      const id = `${docId}-${i + 1}`;
-      insertChunk.run(id, docId, `Section ${i + 1}`, i + 1, content);
-      insertFts.run(id, content);
-    });
-  })();
+  await insertDocument({ doc_id: docId, title, filename: originalName, created_at: new Date().toISOString() });
+  await insertChunks(
+    chunks.map((content, i) => ({
+      chunk_id: `${docId}-${i + 1}`,
+      doc_id: docId,
+      section: `Section ${i + 1}`,
+      page_number: i + 1,
+      content,
+    }))
+  );
   return { docId, count: chunks.length };
 }
