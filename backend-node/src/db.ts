@@ -92,6 +92,19 @@ export async function searchSemantic(queryEmbedding: number[], limit = 6): Promi
     }));
 }
 
+export async function listMissingEmbeddings(limit = 100): Promise<Array<{ chunk_id: string; content: string }>> {
+  const supabase = getClient();
+  const { data, error } = await supabase.from("chunks").select("chunk_id, content").is("embedding", null).limit(limit);
+  if (error) throw new Error(`Failed to list chunks without embeddings: ${error.message}`);
+  return data || [];
+}
+
+export async function updateChunkEmbedding(chunkId: string, embedding: number[]): Promise<void> {
+  const supabase = getClient();
+  const { error } = await supabase.from("chunks").update({ embedding }).eq("chunk_id", chunkId);
+  if (error) throw new Error(`Failed to save chunk embedding: ${error.message}`);
+}
+
 export async function listDocuments(): Promise<
   Array<{ doc_id: string; title: string; filename: string; created_at: string; chunk_count: number }>
 > {

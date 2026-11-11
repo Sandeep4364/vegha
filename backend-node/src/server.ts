@@ -4,7 +4,7 @@ import multer from "multer";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { searchChunks, searchSemantic, listDocuments, getChunk, insertDocument, insertChunks, listVaultNotes, upsertVaultNote } from "./db";
+import { searchChunks, searchSemantic, listDocuments, getChunk, insertDocument, insertChunks, listVaultNotes, upsertVaultNote, listMissingEmbeddings, updateChunkEmbedding } from "./db";
 import { ingest } from "./ingest";
 import { embed, generateAnswer, getAiStatus } from "./ai";
 
@@ -55,6 +55,18 @@ async function seedSampleDocuments() {
 
   for (const file of samples) {
     await ingest(path.join(sampleDir, file), file);
+  }
+}
+async function backfillEmbeddings() {
+  if (!getAiStatus().embeddings) return;
+  const missing = await listMissingEmbeddings();
+  for (const chunk of missing) {
+    try {
+      const vector = await embed(chunk.content);
+      if (vector) await updateChunkEmbedding(chunk.chunk_id, vector);
+    } catch (error) {
+      console.warn(`Embedding backfill skipped for ${chunk.chunk_id}: ${(error as Error).message}`);
+    }
   }
 }
 
@@ -214,6 +226,7 @@ app.post("/api/chat", async (req, res, next) => {
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => res.status(400).json({ detail: err.message }));
 seedVault()
   .then(() => seedSampleDocuments())
+  .then(() => backfillEmbeddings())
   .then(() => {
     app.listen(port, "0.0.0.0", () => console.log(`Vegah Node backend listening on http://127.0.0.1:${port}`));
   })
