@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import mammoth from "mammoth";
 import pdf from "pdf-parse";
 import { insertDocument, insertChunks } from "./db";
+import { embed } from "./ai";
 
 export async function extractText(file: string, ext: string): Promise<string> {
   if (ext === ".docx") return (await mammoth.extractRawText({ path: file })).value;
@@ -20,14 +21,22 @@ export async function ingest(file: string, originalName: string): Promise<{ docI
   const paragraphs = text.split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
   const chunks = paragraphs.length ? paragraphs : [text];
   await insertDocument({ doc_id: docId, title, filename: originalName, created_at: new Date().toISOString() });
-  await insertChunks(
-    chunks.map((content, i) => ({
+  const rows = [];
+  for (let i = 0; i < chunks.length; i += 1) {
+    const content = chunks[i];
+    let embedding: number[] | null = null;
+    try { embedding = await embed(content); } catch (error) {
+      console.warn(`Embedding skipped for ${originalName} chunk ${i + 1}: ${(error as Error).message}`);
+    }
+    rows.push({
       chunk_id: `${docId}-${i + 1}`,
       doc_id: docId,
       section: `Section ${i + 1}`,
       page_number: i + 1,
       content,
-    }))
-  );
+      embedding,
+    });
+  }
+  await insertChunks(rows);
   return { docId, count: chunks.length };
 }

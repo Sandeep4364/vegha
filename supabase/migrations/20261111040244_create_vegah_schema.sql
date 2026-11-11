@@ -51,11 +51,13 @@ CREATE TABLE IF NOT EXISTS chunks (
   section text NOT NULL,
   page_number integer NOT NULL,
   content text NOT NULL,
+  embedding jsonb,
   content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED
 );
 
 CREATE INDEX IF NOT EXISTS chunks_fts_idx ON chunks USING GIN (content_tsv);
 CREATE INDEX IF NOT EXISTS chunks_doc_id_idx ON chunks (doc_id);
+ALTER TABLE chunks ADD COLUMN IF NOT EXISTS embedding jsonb;
 
 CREATE TABLE IF NOT EXISTS vault_notes (
   slug text PRIMARY KEY,

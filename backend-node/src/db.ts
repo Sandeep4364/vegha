@@ -26,6 +26,7 @@ export interface Chunk {
   section: string;
   page_number: number;
   content: string;
+  embedding?: number[] | null;
 }
 
 export function parseWebsearchTerms(query: string): string[] {
@@ -63,6 +64,32 @@ export async function searchChunks(query: string, limit = 6): Promise<Chunk[]> {
     page_number: row.page_number,
     content: row.content,
   }));
+}
+
+export async function searchSemantic(queryEmbedding: number[], limit = 6): Promise<Chunk[]> {
+  const supabase = getClient();
+  const { data, error } = await supabase
+    .from("chunks")
+    .select("chunk_id, doc_id, section, page_number, content, embedding, documents(title)")
+    .not("embedding", "is", null);
+  if (error) throw new Error(`Semantic search failed: ${error.message}`);
+  const norm = Math.sqrt(queryEmbedding.reduce((sum, value) => sum + value * value, 0)) || 1;
+  return (data || [])
+    .map((row: any) => {
+      const vector = Array.isArray(row.embedding) ? row.embedding : [];
+      const vectorNorm = Math.sqrt(vector.reduce((sum: number, value: number) => sum + value * value, 0)) || 1;
+      const score = vector.length === queryEmbedding.length
+        ? vector.reduce((sum: number, value: number, index: number) => sum + value * queryEmbedding[index], 0) / (norm * vectorNorm)
+        : -1;
+      return { score, row };
+    })
+    .filter(item => item.score >= 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ row }: any) => ({
+      chunk_id: row.chunk_id, doc_id: row.doc_id, doc_title: row.documents?.title ?? "",
+      section: row.section, page_number: row.page_number, content: row.content,
+    }));
 }
 
 export async function listDocuments(): Promise<
@@ -113,7 +140,7 @@ export async function insertDocument(doc: {
 }
 
 export async function insertChunks(
-  rows: Array<{ chunk_id: string; doc_id: string; section: string; page_number: number; content: string }>
+  rows: Array<{ chunk_id: string; doc_id: string; section: string; page_number: number; content: string; embedding?: number[] | null }>
 ): Promise<void> {
   const supabase = getClient();
   const { error } = await supabase.from("chunks").insert(rows);

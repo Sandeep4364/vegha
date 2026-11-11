@@ -4,8 +4,9 @@ import multer from "multer";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { searchChunks, listDocuments, getChunk, insertDocument, insertChunks, listVaultNotes, upsertVaultNote } from "./db";
+import { searchChunks, searchSemantic, listDocuments, getChunk, insertDocument, insertChunks, listVaultNotes, upsertVaultNote } from "./db";
 import { ingest } from "./ingest";
+import { embed, generateAnswer, getAiStatus } from "./ai";
 
 const app = express();
 const port = Number(process.env.PORT || 8000);
@@ -57,8 +58,8 @@ async function seedSampleDocuments() {
   }
 }
 
-app.get("/", (_req, res) => res.json({ status: "healthy", service: "Vegah Node Backend", version: "1.0.0", mcp_tools_available: 8, cost_model: "Deterministic local retrieval (no secrets required)" }));
-app.get("/api/health/providers", (_req, res) => res.json({ active_provider: "autonomous_fallback", provider: "local", available: true, fallback_order: ["autonomous_fallback"], recent_failures: [] }));
+app.get("/", (_req, res) => res.json({ status: "healthy", service: "Vegah Node Backend", version: "1.0.0", mcp_tools_available: 8, ai: getAiStatus() }));
+app.get("/api/health/providers", (_req, res) => res.json({ active_provider: getAiStatus().configured ? getAiStatus().provider : "autonomous_fallback", provider: getAiStatus().provider, available: true, ai: getAiStatus(), fallback_order: ["openai", "gemini", "ollama", "autonomous_fallback"], recent_failures: [] }));
 app.get("/api/documents", async (_req, res, next) => {
   try {
     const documents = await listDocuments();
@@ -187,9 +188,27 @@ app.post("/api/chat", async (req, res, next) => {
     const query = String(req.body?.query || "").trim();
     if (!query) return res.status(400).json({ detail: "query is required" });
     const started = Date.now();
-    const hits = await searchChunks(query);
-    const answer = hits.length ? `Based on the indexed documents:\n\n${hits.map(h => h.content).join("\n\n")}` : "No indexed evidence matched your question. Upload a policy document or ask about the available compliance frameworks.";
-    res.json({ query, answer, provider: "autonomous_fallback", cost: "0", latency_ms: Date.now() - started, trace: [{ step: 1, phase: "retrieval", strategy: "Postgres full-text search", duration_ms: Date.now() - started, status: "completed" }], context: { matched_chunks: hits.length }, citations: hits.map(h => ({ chunk_id: h.chunk_id, doc_title: h.doc_title, section: h.section, page_number: h.page_number, score: 0.75, content: h.content, verbatim_excerpt: h.content.slice(0, 300) })) });
+    const lexical = await searchChunks(query);
+    let hits = lexical;
+    let semanticUsed = false;
+    try {
+      const queryEmbedding = await embed(query);
+      if (queryEmbedding) {
+        const semantic = await searchSemantic(queryEmbedding);
+        const merged = [...lexical, ...semantic].filter((chunk, index, all) => all.findIndex(item => item.chunk_id === chunk.chunk_id) === index);
+        hits = merged.slice(0, 6);
+        semanticUsed = true;
+      }
+    } catch (error) { console.warn(`Semantic search unavailable: ${(error as Error).message}`); }
+    let answer = hits.length ? `Based on the indexed documents:\n\n${hits.map(h => h.content).join("\n\n")}` : "No indexed evidence matched your question. Upload a policy document or ask about the available compliance frameworks.";
+    let answerProvider = "autonomous_fallback";
+    if (hits.length && getAiStatus().generation) {
+      try {
+        const generated = await generateAnswer(query, hits);
+        if (generated) { answer = generated; answerProvider = getAiStatus().provider; }
+      } catch (error) { console.warn(`AI answer generation unavailable: ${(error as Error).message}`); }
+    }
+    res.json({ query, answer, provider: answerProvider, cost: answerProvider === "autonomous_fallback" ? "0" : "provider usage", latency_ms: Date.now() - started, trace: [{ step: 1, phase: "retrieval", strategy: semanticUsed ? "Hybrid full-text + embedding search" : "Postgres full-text search", duration_ms: Date.now() - started, status: "completed" }], context: { matched_chunks: hits.length, semantic_search: semanticUsed }, citations: hits.map((h, index) => ({ chunk_id: h.chunk_id, doc_title: h.doc_title, section: h.section, page_number: h.page_number, score: index === 0 ? 0.95 : 0.75, content: h.content, verbatim_excerpt: h.content.slice(0, 300) })) });
   } catch (e) { next(e); }
 });
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => res.status(400).json({ detail: err.message }));
